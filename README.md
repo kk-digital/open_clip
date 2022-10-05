@@ -1,3 +1,13 @@
+## Quick Installation
+```
+git clone https://github.com/kk-digital/open_clip.git
+```
+```
+cd open_clip
+```
+```
+pip install .
+```
 ## API
 
 The Open Clip module `open_clip` provides the following methods:
