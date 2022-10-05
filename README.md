@@ -1,3 +1,32 @@
+## API
+
+The Open Clip module `open_clip` provides the following methods:
+
+#### `open_clip.list_pretrained()`
+
+Returns the names of the available CLIP models.
+
+#### `open_clip.create_model_and_transforms('model-name',pretrained='pretrained-dataset')`
+
+Returns the model and the Preprocess transform needed by the model, specified by the model name and pretrained returned by `open_clip.list_pretrained()`.
+
+
+#### `open_clip.tokenize(["text"])`
+
+Returns a LongTensor containing tokenized sequences of given text input(s). This can be used as the input to the model
+
+---
+
+The model returned by `open_clip.create_model_and_transforms(...)` supports the following methods:
+
+#### `model.encode_image(image: Tensor)`
+
+Given a batch of images, returns the image features.
+
+#### `model.encode_text(text: Tensor)`
+
+Given a batch of text tokens, returns the text features.
+
 # Colab Notebook Demo 
 
 [[Colab]](https://colab.research.google.com/drive/13Jy34AQDbQp0szyparUcDoQg6yt3nnni?usp=sharing)
