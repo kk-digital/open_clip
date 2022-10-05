@@ -1,3 +1,8 @@
+# Colab Notebook Demo 
+
+[[Colab]](https://colab.research.google.com/drive/13Jy34AQDbQp0szyparUcDoQg6yt3nnni?usp=sharing)
+This Colab tests a single image against a list of texts in wordlist.txt 
+
 # OpenCLIP
 
 [[Paper]](https://arxiv.org/abs/2109.01903) [[Colab]](https://colab.research.google.com/github/mlfoundations/open_clip/blob/master/docs/Interacting_with_open_clip.ipynb)
