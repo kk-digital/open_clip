@@ -133,6 +133,39 @@ print(f"Accuracy = {accuracy:.3f}")
 
 ```
 
+### Top-K Matching Text 
+
+The example below shows how to get the top-k matching text to a singl image.
+
+```python
+import open_clip
+import torch
+import PIL
+from PIL import Image
+
+model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32',pretrained='openai')
+
+topk_count = 2 
+image = preprocess(Image.open('download_blue.png')).unsqueeze(0)
+txt_list = ["pixel art" , "photography"]
+k = min(topk_count, len(txt_list))
+
+text = open_clip.tokenize(txt_list)
+
+with torch.no_grad():
+    image_features = model.encode_image(image)
+    text_features = model.encode_text(text)
+    image_features /= image_features.norm(dim=-1, keepdim=True)
+    text_features /= text_features.norm(dim=-1, keepdim=True)
+
+    similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+    values, indices = similarity[0].topk(k)
+    # Print the result
+    print("\nTop predictions:\n")
+    for value, index in zip(values, indices):
+        print(f"{txt_list[index]}: {100 * value.item():.2f}%")
+```
+
 
 
 # Colab Notebook Demo 
