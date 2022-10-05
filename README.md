@@ -27,6 +27,114 @@ Given a batch of images, returns the image features.
 
 Given a batch of text tokens, returns the text features.
 
+
+---
+
+## More Examples
+
+### Zero-Shot Prediction
+
+The code below performs zero-shot prediction using Open Clip. This example takes an image from the [CIFAR-100 dataset](https://www.cs.toronto.edu/~kriz/cifar.html), and predicts the most likely labels among the 100 textual labels from the dataset.
+
+```python
+import os
+import open_clip
+import torch
+from torchvision.datasets import CIFAR100
+
+# Load the model
+model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32',pretrained='openai')
+
+# Download the dataset
+cifar100 = CIFAR100(root=os.path.expanduser("~/.cache"), download=True, train=False)
+
+# Prepare the inputs
+image, class_id = cifar100[3637]
+image_input = preprocess(image).unsqueeze(0)
+text_inputs = torch.cat([open_clip.tokenize(f"a photo of a {c}") for c in cifar100.classes])
+
+# Calculate features
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_inputs)
+
+# Pick the top 5 most similar labels for the image
+image_features /= image_features.norm(dim=-1, keepdim=True)
+text_features /= text_features.norm(dim=-1, keepdim=True)
+similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+values, indices = similarity[0].topk(5)
+
+# Print the result
+print("\nTop predictions:\n")
+for value, index in zip(values, indices):
+    print(f"{cifar100.classes[index]:>16s}: {100 * value.item():.2f}%")
+```
+The output will look like the following (the exact numbers may be slightly different depending on the compute device):
+
+```
+Top predictions:
+
+           snake: 65.31%
+          turtle: 12.29%
+    sweet_pepper: 3.83%
+          lizard: 1.88%
+       crocodile: 1.75%
+```
+
+### Linear-probe evaluation
+
+The example below uses [scikit-learn](https://scikit-learn.org/) to perform logistic regression on image features.
+
+```python
+import os
+import open_clip
+import torch
+
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from torch.utils.data import DataLoader
+from torchvision.datasets import CIFAR100
+from tqdm import tqdm
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+# Load the model
+model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32',pretrained='openai')
+
+# Load the dataset
+root = os.path.expanduser("~/.cache")
+train = CIFAR100(root, download=True, train=True, transform=preprocess)
+test = CIFAR100(root, download=True, train=False, transform=preprocess)
+
+def get_features(dataset):
+    all_features = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for images, labels in tqdm(DataLoader(dataset, batch_size=100)):
+            features = model.encode_image(images.to(device))
+
+            all_features.append(features)
+            all_labels.append(labels)
+
+    return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy()
+
+# Calculate the image features
+train_features, train_labels = get_features(train)
+test_features, test_labels = get_features(test)
+
+# Perform logistic regression
+classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
+classifier.fit(train_features, train_labels)
+
+# Evaluate using the logistic regression classifier
+predictions = classifier.predict(test_features)
+accuracy = np.mean((test_labels == predictions).astype(np.float)) * 100.
+print(f"Accuracy = {accuracy:.3f}")
+
+```
+
+
+
 # Colab Notebook Demo 
 
 [[Colab]](https://colab.research.google.com/drive/13Jy34AQDbQp0szyparUcDoQg6yt3nnni?usp=sharing)
