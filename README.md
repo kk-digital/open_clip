@@ -52,7 +52,10 @@ with torch.no_grad(), torch.cuda.amp.autocast():
     text_features = model.encode_text(text)
     image_features /= image_features.norm(dim=-1, keepdim=True)
     text_features /= text_features.norm(dim=-1, keepdim=True)
-
+    # Calculating the cosine similarity between text features and image features 
+    # .T for transpose 
+    # @ for matrix multiplication
+    # making softmax (values between the range of 0 to 1)
     text_probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)
 
 print("Label probs:", text_probs)  # prints: [[1., 0., 0.]]
