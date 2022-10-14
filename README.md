@@ -8,6 +8,12 @@ cd open_clip
 ```
 pip install .
 ```
+## Notebooks 
+
+Test Example Notebook
+[a relative link](notebooks/example.ipynb)
+
+
 ## API
 
 The Open Clip module `open_clip` provides the following methods:
