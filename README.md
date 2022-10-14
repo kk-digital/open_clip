@@ -9,10 +9,17 @@ cd open_clip
 pip install .
 ```
 ## Notebooks 
+**Run the notebooks from it's locations.
 
-Test Example Notebook
-[Test Example Notebook](notebooks/example.ipynb)
+[Test Example Notebook](notebooks/example.ipynb) : An example notebook to test the OpenClip model. 
 
+[Download Models Notebook](notebooks/DownlaodingModels.ipynb) : A notebook which helps you in downloading the models.
+
+[Image Interrogator](notebooks/interrogator_single_image.ipynb) : A notebook of interrogator function implemetation.
+
+[Top K Image Interrogator](notebooks/InterrogateSingleImage_TopK.ipynb) : Top-K interrogator results implementation.
+
+[Image-Image Similarity](notebooks/Image_Image_similarity.ipynb) : Similarity between images function implementation.
 
 ## API
 
