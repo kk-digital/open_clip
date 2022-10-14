@@ -11,7 +11,7 @@ pip install .
 ## Notebooks 
 
 Test Example Notebook
-[a relative link](notebooks/example.ipynb)
+[Test Example Notebook](notebooks/example.ipynb)
 
 
 ## API
