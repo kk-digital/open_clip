@@ -1,20 +1,21 @@
 
 import torch
 from PIL import Image
-from open_clip import tokenizer
+from open_clip.factory import get_tokenizer
 import pytest
 import open_clip
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-@pytest.mark.parametrize("jit", [False, True])
-def test_inference(jit):
-    model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32-quickgelu', pretrained='laion400m_e32', jit=jit)
+@pytest.mark.parametrize("model_type,pretrained", [("ViT-B-32-quickgelu", "laion400m_e32"), ("roberta-ViT-B-32", "laion2b_s12b_b32k")])
+def test_inference_simple(model_type, pretrained):
+    model, _, preprocess = open_clip.create_model_and_transforms(model_type, pretrained=pretrained, jit=False)
+    tokenizer = get_tokenizer(model_type)
 
     current_dir = os.path.dirname(os.path.realpath(__file__))
 
     image = preprocess(Image.open(current_dir + "/../docs/CLIP.png")).unsqueeze(0)
-    text = tokenizer.tokenize(["a diagram", "a dog", "a cat"])
+    text = tokenizer(["a diagram", "a dog", "a cat"])
 
     with torch.no_grad():
         image_features = model.encode_image(image)

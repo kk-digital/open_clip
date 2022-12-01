@@ -10,19 +10,19 @@ def get_default_params(model_name):
         return {"lr": 5.0e-4, "beta1": 0.9, "beta2": 0.999, "eps": 1.0e-8}
 
 
-def parse_args():
+def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--train-data",
         type=str,
         default=None,
-        help="Path to csv filewith training data",
+        help="Path to file(s) with training data",
     )
     parser.add_argument(
         "--val-data",
         type=str,
         default=None,
-        help="Path to csv file with validation data",
+        help="Path to file(s) with validation data",
     )
     parser.add_argument(
         "--train-num-samples",
@@ -38,7 +38,7 @@ def parse_args():
     )
     parser.add_argument(
         "--dataset-type",
-        choices=["webdataset", "csv", "auto"],
+        choices=["webdataset", "csv", "synthetic", "auto"],
         default="auto",
         help="Which type of dataset to process."
     )
@@ -147,7 +147,7 @@ def parse_args():
     )
     parser.add_argument(
         "--precision",
-        choices=["amp", "amp_bfloat16", "fp16", "fp32"],
+        choices=["amp", "amp_bf16", "amp_bfloat16", "bf16", "fp16", "fp32"],
         default="amp",
         help="Floating point precision."
     )
@@ -218,6 +218,12 @@ def parse_args():
         help="Force use of QuickGELU activation for non-OpenAI transformer models.",
     )
     parser.add_argument(
+        "--force-custom-text",
+        default=False,
+        action='store_true',
+        help="Force use of CustomTextCLIP model (separate text-tower).",
+    )
+    parser.add_argument(
         "--torchscript",
         default=False,
         action='store_true',
@@ -261,7 +267,7 @@ def parse_args():
         "--copy-codebase",
         default=False,
         action="store_true",
-        help="If true, we copy the entire base on the log diretory, and execute from there."
+        help="If true, we copy the entire base on the log directory, and execute from there."
     )
     parser.add_argument(
         "--horovod",
@@ -285,9 +291,35 @@ def parse_args():
         "--seed", type=int, default=0, help="Default random seed."
     )
     parser.add_argument(
-        "--norm_gradient_clip", type=float, default=None, help="Gradient clip."
+        "--grad-clip-norm", type=float, default=None, help="Gradient clip."
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--lock-text",
+        default=False,
+        action='store_true',
+        help="Lock full text tower by disabling gradients.",
+    )
+    parser.add_argument(
+        "--lock-text-unlocked-layers",
+        type=int,
+        default=0,
+        help="Leave last n image tower layer groups unlocked.",
+    )
+    parser.add_argument(
+        "--lock-text-freeze-layer-norm",
+        default=False,
+        action='store_true',
+        help="Freeze BatchNorm running stats in image tower for any locked layers.",
+    )
+    parser.add_argument(
+        "--log-every-n-steps",
+        type=int,
+        default=100,
+        help="Log every n steps to tensorboard/console/wandb.",
+    )
+
+
+    args = parser.parse_args(args)
 
     # If some params are not passed, we use the default values based on model name.
     default_params = get_default_params(args.model)

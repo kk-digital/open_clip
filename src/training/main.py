@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import random
 from datetime import datetime
 
@@ -23,7 +24,7 @@ try:
 except ImportError:
     hvd = None
 
-from open_clip import create_model_and_transforms, trace_model
+from open_clip import create_model_and_transforms, trace_model, get_tokenizer
 from training.data import get_data
 from training.distributed import is_master, init_distributed_device, world_info_from_env
 from training.logger import setup_logging
@@ -38,8 +39,8 @@ def random_seed(seed=42, rank=0):
     random.seed(seed + rank)
 
 
-def main():
-    args = parse_args()
+def main(args):
+    args = parse_args(args)
 
     if torch.cuda.is_available():
         # This enables tf32 on Ampere GPUs which is only 8% slower than
@@ -101,7 +102,6 @@ def main():
     if args.copy_codebase:
         copy_codebase(args)
 
-    assert args.precision in ['amp', 'amp_bfloat16', 'fp16', 'fp32']
     if args.precision == 'fp16':
         logging.warning(
             'It is recommended to use AMP mixed-precision instead of FP16. '
@@ -126,6 +126,7 @@ def main():
         device=device,
         jit=args.torchscript,
         force_quick_gelu=args.force_quick_gelu,
+        force_custom_text=args.force_custom_text,
         pretrained_image=args.pretrained_image,
         image_mean=args.image_mean,
         image_std=args.image_std,
@@ -140,6 +141,10 @@ def main():
         model.lock_image_tower(
             unlocked_groups=args.lock_image_unlocked_groups,
             freeze_bn_stats=args.lock_image_freeze_bn_stats)
+    if args.lock_text:
+        model.lock_text_tower(
+            unlocked_layers=args.lock_text_unlocked_layers,
+            freeze_layer_norm=args.lock_text_freeze_layer_norm)
 
     if args.grad_checkpointing:
         model.set_grad_checkpointing()
@@ -167,7 +172,8 @@ def main():
     # create optimizer and scaler
     optimizer = None
     scaler = None
-    if args.train_data:
+
+    if args.train_data or args.dataset_type == "synthetic":
         assert not args.trace, 'Cannot train with traced model'
 
         exclude = lambda n, p: p.ndim < 2 or "bn" in n or "ln" in n or "bias" in n or 'logit_scale' in n
@@ -218,7 +224,7 @@ def main():
             logging.info("=> no checkpoint found at '{}'".format(args.resume))
 
     # initialize datasets
-    data = get_data(args, (preprocess_train, preprocess_val), epoch=start_epoch)
+    data = get_data(args, (preprocess_train, preprocess_val), epoch=start_epoch, tokenizer=get_tokenizer(args.model))
     assert len(data), 'At least one train or eval dataset must be specified.'
 
     # create scheduler if train
@@ -313,4 +319,4 @@ def copy_codebase(args):
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])

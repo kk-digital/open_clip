@@ -4,17 +4,18 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from open_clip import tokenize
+from open_clip import get_cast_dtype, get_tokenizer
 from .precision import get_autocast
 from .imagenet_zeroshot_data import imagenet_classnames, openai_imagenet_template
 
 
 def zero_shot_classifier(model, classnames, templates, args):
+    tokenizer = get_tokenizer(args.model)
     with torch.no_grad():
         zeroshot_weights = []
         for classname in tqdm(classnames):
             texts = [template(classname) for template in templates]  # format with class
-            texts = tokenize(texts).to(args.device)  # tokenize
+            texts = tokenizer(texts).to(args.device)  # tokenize
             if args.distributed and not args.horovod:
                 class_embeddings = model.module.encode_text(texts)
             else:
@@ -34,10 +35,13 @@ def accuracy(output, target, topk=(1,)):
 
 def run(model, classifier, dataloader, args):
     autocast = get_autocast(args.precision)
+    cast_dtype = get_cast_dtype(args.precision)
     with torch.no_grad():
         top1, top5, n = 0., 0., 0.
         for images, target in tqdm(dataloader, unit_scale=args.batch_size):
             images = images.to(args.device)
+            if cast_dtype is not None:
+                images = images.to(dtype=cast_dtype)
             target = target.to(args.device)
 
             with autocast():

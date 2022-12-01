@@ -142,6 +142,18 @@ _VITg14 = dict(
     laion2b_s12b_b42k=_pcfg(hf_hub='laion/CLIP-ViT-g-14-laion2B-s12B-b42K/'),
 )
 
+_robertaViTB32 = dict(
+    laion2b_s12b_b32k=_pcfg(hf_hub='laion/CLIP-ViT-B-32-roberta-base-laion2B-s12B-b32k/'),
+)
+
+_xlmRobertaBaseViTB32 = dict(
+    laion5b_s13b_b90k=_pcfg(hf_hub='laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k/'),
+)
+
+_xlmRobertaLargeFrozenViTH14 = dict(
+    frozen_laion5b_s13b_b90k=_pcfg(hf_hub='laion/CLIP-ViT-H-14-frozen-xlm-roberta-large-laion5B-s13B-b90k/'),
+)
+
 _PRETRAINED = {
     "RN50": _RN50,
     "RN50-quickgelu": _RN50_quickgelu,
@@ -158,6 +170,9 @@ _PRETRAINED = {
     "ViT-L-14-336": _VITL14_336,
     "ViT-H-14": _VITH14,
     "ViT-g-14": _VITg14,
+    "roberta-ViT-B-32": _robertaViTB32,
+    "xlm-roberta-base-ViT-B-32": _xlmRobertaBaseViTB32,
+    "xlm-roberta-large-ViT-H-14": _xlmRobertaLargeFrozenViTH14,
 }
 
 
@@ -168,7 +183,7 @@ def list_pretrained(as_str: bool = False):
     return [':'.join([k, t]) if as_str else (k, t) for k in _PRETRAINED.keys() for t in _PRETRAINED[k].keys()]
 
 
-def list_pretrained_tag_models(tag: str):
+def list_pretrained_models_by_tag(tag: str):
     """ return all models having the specified pretrain tag """
     models = []
     for k in _PRETRAINED.keys():
@@ -177,7 +192,7 @@ def list_pretrained_tag_models(tag: str):
     return models
 
 
-def list_pretrained_model_tags(model: str):
+def list_pretrained_tags_by_model(model: str):
     """ return all pretrain tags for the specified model architecture """
     tags = []
     if model in _PRETRAINED:
@@ -214,6 +229,8 @@ def download_pretrained_from_url(
 
     if 'openaipublic' in url:
         expected_sha256 = url.split("/")[-2]
+    elif 'mlfoundations' in url:
+        expected_sha256 = os.path.splitext(filename)[0].split("-")[-1]
     else:
         expected_sha256 = ''
 
@@ -224,7 +241,7 @@ def download_pretrained_from_url(
 
     if os.path.isfile(download_target):
         if expected_sha256:
-            if hashlib.sha256(open(download_target, "rb").read()).hexdigest() == expected_sha256:
+            if hashlib.sha256(open(download_target, "rb").read()).hexdigest().startswith(expected_sha256):
                 return download_target
             else:
                 warnings.warn(f"{download_target} exists, but the SHA256 checksum does not match; re-downloading the file")
@@ -232,7 +249,7 @@ def download_pretrained_from_url(
             return download_target
 
     with urllib.request.urlopen(url) as source, open(download_target, "wb") as output:
-        with tqdm(total=int(source.info().get("Content-Length")), ncols=80, unit='iB', unit_scale=True) as loop:
+        with tqdm(total=int(source.headers.get("Content-Length")), ncols=80, unit='iB', unit_scale=True) as loop:
             while True:
                 buffer = source.read(8192)
                 if not buffer:
@@ -241,7 +258,7 @@ def download_pretrained_from_url(
                 output.write(buffer)
                 loop.update(len(buffer))
 
-    if expected_sha256 and hashlib.sha256(open(download_target, "rb").read()).hexdigest() != expected_sha256:
+    if expected_sha256 and not hashlib.sha256(open(download_target, "rb").read()).hexdigest().startswith(expected_sha256):
         raise RuntimeError(f"Model has been downloaded but the SHA256 checksum does not not match")
 
     return download_target

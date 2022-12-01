@@ -219,7 +219,7 @@ We have trained:
 
 As we describe in more detail [below](#why-are-low-accuracy-clip-models-interesting), CLIP models in a medium accuracy regime already allow us to draw conclusions about the robustness of larger CLIP models since the models follow [reliable scaling laws](https://arxiv.org/abs/2107.04649).
 
-This codebase is work in progress, and we invite all to contribute in making it more acessible and useful. In the future, we plan to add support for TPU training and release larger models. We hope this codebase facilitates and promotes further research in contrastive image-text learning. Please submit an issue or send an email if you have any other requests or suggestions.
+This codebase is work in progress, and we invite all to contribute in making it more accessible and useful. In the future, we plan to add support for TPU training and release larger models. We hope this codebase facilitates and promotes further research in contrastive image-text learning. Please submit an issue or send an email if you have any other requests or suggestions.
 
 Note that portions of `src/open_clip/` modelling and tokenizer code are adaptations of OpenAI's official [repository](https://github.com/openai/CLIP).
 
@@ -241,9 +241,10 @@ from PIL import Image
 import open_clip
 
 model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32-quickgelu', pretrained='laion400m_e32')
+tokenizer = open_clip.get_tokenizer('ViT-B-32-quickgelu')
 
 image = preprocess(Image.open("CLIP.png")).unsqueeze(0)
-text = open_clip.tokenize(["a diagram", "a dog", "a cat"])
+text = tokenizer(["a diagram", "a dog", "a cat"])
 
 with torch.no_grad(), torch.cuda.amp.autocast():
     image_features = model.encode_image(image)
@@ -293,43 +294,33 @@ The indices of images in this subset are in [OpenAI's CLIP repository](https://g
 
 ## Training CLIP
 
-### Setup Environment and Install dependencies
+### Install
 
-#### Conda
+We advise you first create a virtual environment with:
 
-```bash
-# Create a conda environment (heavily recommended)
-conda create -n open_clip python=3.10
-conda activate open_clip
-```
-
-Install conda PyTorch as per https://pytorch.org/get-started/locally/
-
-#### Virtualenv
-
-openclip also can be used with virtualenv with these lines:
 ```
 python3 -m venv .env
 source .env/bin/activate
 pip install -U pip
-make install
 ```
+
+You can then install openclip for training with `pip install 'open_clip_torch[training]'`.
+
+#### Development
+
+If you want to make changes to contribute code, you can close openclip then run `make install` in openclip folder (after creating a virtualenv)
 
 Install pip PyTorch as per https://pytorch.org/get-started/locally/
 
-Test can be run with `make install-dev` then `make test`
 
-#### Other dependencies
+Test can be run with `make install-test` then `make test`
 
-Install open_clip pacakge and remaining dependencies:
+`python -m pytest -x -s -v tests -k "training"` to run a specific test
 
-```bash
-cd open_clip
-python setup.py install
-```
+When introducing new models, `python tests/util_test.py --model=xlm-roberta-large-ViT-H-14` can generate new output expected data.
 
-If you want to train models, you will also need to install the packages
-from `requirements-training.txt`.
+You may run `make install-training` to install training deps
+
 
 ### Sample single-process running code:
 
@@ -456,6 +447,29 @@ python -m training.main \
     --resume /path/to/checkpoints/epoch_K.pt
 ```
 
+### Training with pre-trained language models as text encoder:
+
+If you wish to use different language models as the text encoder for CLIP you can do so by using one of the huggingface model configs in ```src/open_clip/model_configs``` and passing in it's tokenizer as the ```--model``` and ```--hf-tokenizer-name``` parameters respectively. Currently we only support RoBERTa ("test-roberta" config), however adding new models should be trivial. You can also determine how many layers, from the end, to leave unfrozen with the ```--lock-text-unlocked-layers``` parameter. Here's an example command to train CLIP with the RoBERTa LM that has it's last 10 layers unfrozen:
+```bash
+python -m training.main \
+         --train-data="pipe:aws s3 cp s3://s-mas/cc3m/{00000..00329}.tar -" \
+         --train-num-samples 3000000 \
+         --val-data="pipe:aws s3 cp s3://s-mas/cc3m/{00330..00331}.tar -" \
+         --val-num-samples 10000 \
+         --dataset-type webdataset \
+         --batch-size 256 \
+         --warmup 2000 \
+         --epochs 10 \
+         --lr 5e-4 \
+         --precision amp \
+         --workers 6 \
+         --model "roberta-ViT-B-32" \
+         --lock-text \
+         --lock-text-unlocked-layers 10 \
+         --name "10_unfrozen" \
+         --report-to "tensorboard" \
+```
+
 ### Loss Curves
 
 When run on a machine with 8 GPUs the command should produce the following training curve for Conceptual Captions:
@@ -571,9 +585,36 @@ A ViT-H/14 with a 78.0% top-1 ImageNet-1k zero-shot was trained on JUWELS Booste
 
 #### ViT-g/14 224x224
 
-A ViT-H/14 with a 76.6% top-1 ImageNet-1k zero-shot was trained on JUWELS Booster. See model details here https://huggingface.co/laion/CLIP-ViT-g-14-laion2B-s12B-b42K
+A ViT-g/14 with a 76.6% top-1 ImageNet-1k zero-shot was trained on JUWELS Booster. See model details here https://huggingface.co/laion/CLIP-ViT-g-14-laion2B-s12B-b42K
 
 This model was trained with a shorted schedule than other LAION-2B models with 12B samples seen instead of 32+B. It matches LAION-400M training in samples seen. Many zero-shot results are lower as a result, but despite this it performs very well in some OOD zero-shot and retrieval tasks.
+
+
+#### ViT-B/32 roberta base
+
+A ViT-B/32 with roberta base encoder with a 61.7% top-1 ImageNet-1k zero-shot was trained on stability. See model details here https://huggingface.co/laion/CLIP-ViT-B-32-roberta-base-laion2B-s12B-b32k
+This is the first openclip model using a HF text tower. It has better performance on a range of tasks compared to the standard text encoder, see [metrics](https://huggingface.co/laion/CLIP-ViT-B-32-roberta-base-laion2B-s12B-b32k/blob/main/unknown.png)
+
+#### ViT-B/32 xlm roberta base
+
+A ViT-B/32 with xlm roberta base encoder with a 62.33% top-1 ImageNet-1k zero-shot was trained on stability. See model details here https://huggingface.co/laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k
+This is the first openclip model trained on the full laion5B dataset; hence the first multilingual clip trained with openclip. It has better performance on a range of tasks compared to the standard text encoder, see [metrics](https://huggingface.co/laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k/blob/main/metrics.png)
+A preliminary multilingual evaluation was run: 43% on imagenet1k italian (vs 21% for english B/32), 37% for imagenet1k japanese (vs 1% for english B/32 and 50% for B/16 clip japanese). It shows the multilingual property is indeed there as expected. Larger models will get even better performance.
+
+#### ViT-H/14 xlm roberta large
+
+A ViT-H/14 with xlm roberta large encoder with a 77.0% (vs 78% for the english equivalent) top-1 ImageNet-1k zero-shot was trained on stability. See model details here https://huggingface.co/laion/CLIP-ViT-H-14-frozen-xlm-roberta-large-laion5B-s13B-b90k
+
+This model was trained following the [LiT](https://arxiv.org/abs/2111.07991) methodology: the image tower was frozen (initialized from english openclip ViT-H/14), the text tower was initialized from [xlm roberta large](https://huggingface.co/xlm-roberta-large) and unfrozen. This reduced training cost by a 3x factor.
+
+See full english [metrics](https://huggingface.co/laion/CLIP-ViT-H-14-frozen-xlm-roberta-large-laion5B-s13B-b90k/resolve/main/results_xlm_roberta_large.png)
+
+On zero shot classification on imagenet with translated prompts this model reaches:
+
+* 56% in italian (vs 21% for https://github.com/clip-italian/clip-italian)
+* 53% in japanese (vs 54.6% for https://github.com/rinnakk/japanese-clip)
+* 55.7% in chinese (to be compared with https://github.com/OFA-Sys/Chinese-CLIP)
+
 
 #### YFCC-15M
 
@@ -590,7 +631,7 @@ Below are checkpoints of models trained on YFCC-15M, along with their zero-shot 
 
 We offer a simple model interface to instantiate both pre-trained and untrained models.
 
-NOTE: Many existing checkpoints use the QuickGELU activation from the original OpenAI models. This activation is actually less efficient that native torch.nn.GELU in recent versions of PyTorch. The model defaults are now nn.GELU, so one should use model definitions with `-quickgelu` postfix for the OpenCLIP pretrained weights. All OpenAI pretrained weights will always default to QuickGELU. One can also use the non `-quickgelu` model definitions with pretrained weights using QuickGELU but there will be an accuracy drop, for fine-tune that will likely vanish for longer runs.
+NOTE: Many existing checkpoints use the QuickGELU activation from the original OpenAI models. This activation is actually less efficient than native torch.nn.GELU in recent versions of PyTorch. The model defaults are now nn.GELU, so one should use model definitions with `-quickgelu` postfix for the OpenCLIP pretrained weights. All OpenAI pretrained weights will always default to QuickGELU. One can also use the non `-quickgelu` model definitions with pretrained weights using QuickGELU but there will be an accuracy drop, for fine-tune that will likely vanish for longer runs.
 
 Future trained models will use nn.GELU.
 
@@ -629,7 +670,10 @@ Future trained models will use nn.GELU.
  ('ViT-L-14', 'laion2b_s32b_b82k'),
  ('ViT-L-14-336', 'openai'),
  ('ViT-H-14', 'laion2b_s32b_b79k'),
- ('ViT-g-14', 'laion2b_s12b_b42k')]
+ ('ViT-g-14', 'laion2b_s12b_b42k'),
+ ('roberta-ViT-B-32', 'laion2b_s12b_b32k'),
+ ('xlm-roberta-base-ViT-B-32', 'laion5b_s13b_b90k'),
+ ('xlm-roberta-large-ViT-H-14', 'frozen_laion5b_s13b_b90k'),]
 
 >>> model, train_transform, eval_transform = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')
 ```
